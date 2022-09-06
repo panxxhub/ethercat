@@ -1,0 +1,42 @@
+{
+	"editor.fontFamily": "'Fira Code', 'Cascadia Code', 'Jetbrains Mono', Consolas, 'Courier New', monospace",
+	"editor.fontLigatures": true,
+	"editor.semanticHighlighting.enabled": true,
+	"editor.experimental.pasteActions.enabled": true,
+	"editor.stickyScroll.enabled": true,
+	"editor.formatOnSave": true,
+	"editor.fastScrollSensitivity": 5,
+	"rust-analyzer.rustfmt.rangeFormatting.enable": true,
+	"editor.bracketPairColorization.enabled": true,
+	"editor.codeLens": true,
+	"editor.codeLensFontFamily": "'Jetbrains Mono', Consolas, 'Courier New', monospace",
+	"workbench.colorTheme": "Atom One Dark",
+	"terminal.integrated.fontFamily": "Hasklug NF",
+	"terminal.integrated.env.linux": {
+		"ETHERCAT_PATH": "/home/pan/ethercat_ws/igh",
+	},
+	"editor.semanticTokenColorCustomizations": {
+		"rules": {
+			"*.mutable": {
+				"fontStyle": "underline"
+			},
+			"*.async": {
+				"fontStyle": "italic"
+			},
+			"*.clojure": {
+				"fontStyle": "italic underline"
+			},
+			"*.attribute": {
+				"italic": false,
+				"fontStyle": "bold"
+			},
+			"*.function": {
+				"fontStyle": "bold"
+			},
+		}
+	},
+	"cSpell.words": [
+		"minigrep",
+		"mwebsrv"
+	]
+}
