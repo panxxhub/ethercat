@@ -9,10 +9,10 @@ license = "MIT/Apache-2.0"
 edition = "2018"
 
 [dependencies]
-ioctl-sys = "0.5.2"
+ioctl-sys = "0.8.0"
 
 [build-dependencies]
-bindgen = "0.55.1"
+bindgen = "0.60.1"
 
 [features]
 default = []
