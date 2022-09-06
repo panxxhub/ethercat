@@ -14,7 +14,7 @@ edition = "2018"
 [dependencies]
 derive-new = "0.5"
 ethercat-sys = { path = "ethercat-sys", version = "0.2" }
-ethercat-types = "0.3.1"
+ethercat-types = "0.3"
 libc = "0.2"
 log = "0.4"
 memmap = "0.7"
@@ -50,3 +50,5 @@ name = "info"
 name = "sdo"
 [[example]]
 name = "cyclic-data"
+[[example]]
+name = "ecat-804"
