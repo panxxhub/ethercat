@@ -1,4 +1,3 @@
-use byteorder::{BigEndian, ReadBytesExt};
 use std::{collections::HashMap, convert::TryFrom, io};
 
 use ethercat::{
@@ -16,8 +15,8 @@ struct MyRxPdo {
 }
 #[repr(C, packed)]
 struct MyTxPdo {
-    status_word: u16,
     position_actual_value: i32,
+    status_word: u16,
 }
 #[repr(C, packed)]
 struct MyDomainData {
@@ -25,50 +24,16 @@ struct MyDomainData {
     tx: MyTxPdo,
 }
 
-// impl try from
-impl TryFrom<&mut [u8]> for MyRxPdo {
-    type Error = io::Error;
-
-    fn try_from(value: &mut [u8]) -> Result<Self, Self::Error> {
-        let mut rdr = io::Cursor::new(value);
-        Ok(Self {
-            mode_of_operation: rdr.read_u8()?,
-            control_word: rdr.read_u16::<BigEndian>()?,
-            target_position: rdr.read_i32::<BigEndian>()?,
-            profile_velocity: rdr.read_i32::<BigEndian>()?,
-        })
-    }
-}
-impl TryFrom<&[u8]> for MyTxPdo {
-    type Error = io::Error;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let mut rdr = io::Cursor::new(value);
-        Ok(Self {
-            status_word: rdr.read_u16::<BigEndian>()?,
-            position_actual_value: rdr.read_i32::<BigEndian>()?,
-        })
-    }
-}
-
-impl TryFrom<&mut [u8]> for MyDomainData {
-    type Error = io::Error;
-
-    fn try_from(value: &mut [u8]) -> Result<Self, Self::Error> {
-        Ok(Self {
-            rx: MyRxPdo::try_from(&mut value[0..11])?,
-            tx: MyTxPdo::try_from(&value[11..17])?,
-        })
-    }
-}
-
-// read
-
 #[tokio::main]
 pub async fn main() -> Result<(), std::io::Error> {
     env_logger::init();
     sleep_until(Instant::now() + Duration::from_millis(100)).await;
     let (mut master, domain_idx) = init_master()?;
+
+    log::debug!(
+        "size of MyDomainData: {}",
+        std::mem::size_of::<MyDomainData>()
+    );
 
     // spawn a task to cyclically read data from the EtherCAT master
 
@@ -101,17 +66,30 @@ pub async fn main() -> Result<(), std::io::Error> {
 }
 
 fn cyclic_work(domain_data: &mut [u8]) {
-    let ptr = domain_data.as_ptr();
+    let ptr = domain_data.as_mut_ptr();
     // read data from the domain
+    use std::mem::transmute;
+    let data = unsafe { transmute::<*mut u8, &mut MyDomainData>(ptr) };
 
-    let data = MyDomainData::try_from(domain_data).unwrap();
-    let status_word = data.tx.status_word;
-    let actual_position = data.tx.position_actual_value;
+    let status_word: u16 = data.tx.status_word;
+    let actual_position: i32 = data.tx.position_actual_value;
+
     log::debug!("tx: status:{}, actual_pos {}", status_word, actual_position);
 
-    // check data's pointer and domain_data's pointer are the same
+    if status_word == 0x6 {
+        data.rx.control_word = 0x7;
+    } else if status_word == 0x7 {
+        data.rx.control_word = 0xf;
+    } else {
+        data.rx.control_word = 0x6;
+    }
 
-    log::debug!("data: {:p}, domain_data: {:p}", &data as *const _, ptr);
+    //    check data's pointer and domain_data's pointer are the same
+    // log::debug!(
+    //     "domain_data: {:p}, data: {:p}",
+    //     domain_data.as_ptr(),
+    //     data as *const _ as *const u8
+    // );
 }
 
 fn init_master() -> Result<(Master, DomainIdx), io::Error> {
@@ -192,16 +170,6 @@ fn init_master() -> Result<(Master, DomainIdx), io::Error> {
     let s1_tx_pdos = vec![PdoCfg {
         idx: PdoIdx::from(0x1A00),
         entries: vec![
-            // status word
-            PdoEntryInfo {
-                entry_idx: PdoEntryIdx {
-                    idx: Idx::from(0x6041),
-                    sub_idx: SubIdx::from(0),
-                },
-                bit_len: 16,
-                name: "Statusword".to_string(),
-                pos: PdoEntryPos::from(0),
-            },
             // actual position
             PdoEntryInfo {
                 entry_idx: PdoEntryIdx {
@@ -210,6 +178,16 @@ fn init_master() -> Result<(Master, DomainIdx), io::Error> {
                 },
                 bit_len: 32,
                 name: "Actual position".to_string(),
+                pos: PdoEntryPos::from(0),
+            },
+            // status word
+            PdoEntryInfo {
+                entry_idx: PdoEntryIdx {
+                    idx: Idx::from(0x6041),
+                    sub_idx: SubIdx::from(0),
+                },
+                bit_len: 16,
+                name: "Statusword".to_string(),
                 pos: PdoEntryPos::from(1),
             },
         ],
