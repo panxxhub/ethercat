@@ -12,6 +12,7 @@ license = "MIT/Apache-2.0"
 edition = "2018"
 
 [dependencies]
+byteorder = "1.4.3"
 derive-new = "0.5"
 ethercat-sys = { path = "ethercat-sys", version = "0.2" }
 ethercat-types = "0.3"
@@ -20,6 +21,7 @@ log = "0.4"
 memmap = "0.7"
 num-traits = "0.2"
 thiserror = "1.0"
+tokio = { version = "1.21.0", features=["full"]}
 
 [dev-dependencies]
 ethercat-esi = "0.1.0"
