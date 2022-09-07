@@ -1,3 +1,6 @@
+// const STATUS_FAULT_BIT: u16 = 0x0008;
+// const STATUS_SWITCH_ON_BIT: u16 = 0x0040;
+
 use std::{collections::HashMap, convert::TryFrom, io};
 
 use ethercat::{
@@ -43,8 +46,6 @@ pub async fn main() -> Result<(), std::io::Error> {
         loop {
             master.receive().unwrap();
             master.domain(domain_idx).process().unwrap();
-            master.domain(domain_idx).queue().unwrap();
-            master.send().unwrap();
             let m_state = master.state().unwrap();
             let _d_state = master.domain(domain_idx).state();
             // log::debug!("Master state: {:?}", m_state);
@@ -54,6 +55,9 @@ pub async fn main() -> Result<(), std::io::Error> {
                 let raw_data = master.domain_data(domain_idx).unwrap();
                 cyclic_work(raw_data);
             }
+            master.domain(domain_idx).queue().unwrap();
+            master.send().unwrap();
+
             sleep_until(next_cycle).await;
             next_cycle += cycle_time;
         }
@@ -74,22 +78,21 @@ fn cyclic_work(domain_data: &mut [u8]) {
     let status_word: u16 = data.tx.status_word;
     let actual_position: i32 = data.tx.position_actual_value;
 
-    log::debug!("tx: status:{}, actual_pos {}", status_word, actual_position);
-
-    if status_word == 0x6 {
+    let control_word: u16 = data.rx.control_word;
+    if control_word == 0x6 {
         data.rx.control_word = 0x7;
-    } else if status_word == 0x7 {
+    } else if control_word == 0x7 {
         data.rx.control_word = 0xf;
-    } else {
+    } else if control_word != 0xf {
         data.rx.control_word = 0x6;
     }
 
-    //    check data's pointer and domain_data's pointer are the same
-    // log::debug!(
-    //     "domain_data: {:p}, data: {:p}",
-    //     domain_data.as_ptr(),
-    //     data as *const _ as *const u8
-    // );
+    log::debug!(
+        "tx: status:{}, actual_pos {}, control_word {}",
+        status_word,
+        actual_position,
+        control_word
+    );
 }
 
 fn init_master() -> Result<(Master, DomainIdx), io::Error> {
