@@ -1,6 +1,9 @@
-use crate::servo::{
-    servo::{ServoInitializer, PDO_SIZE, RX_PDO_SIZE, TX_PDO_SIZE},
-    servo_pdo::ServoPdo,
+use crate::{
+    feeder::{feeder1st::Feeder1st, feeder2nd::Feeder2nd, feeder3rd::Feeder3rd},
+    servo::{
+        servo::{ServoInitializer, PDO_SIZE},
+        servo_pdo::ServoPdo,
+    },
 };
 
 pub const DOMAIN_SIZE: usize = 2 * (PDO_SIZE) + 2 * 2;
@@ -25,6 +28,10 @@ pub struct MachineRunnerFsm {
     pub last_input: u16,
     pub op_pressed_count: u16,
     state: fn(&mut MachineRunnerFsm, &mut DomainData),
+
+    feeder1st: Feeder1st,
+    feeder2nd: Feeder2nd,
+    feeder3rd: Feeder3rd,
 }
 
 impl TopLevel {
@@ -49,9 +56,12 @@ impl TopLevel {
             .reduce(|a, b| a && b)
             .unwrap()
         {
+            log::debug!("init finished!");
             self.state = TopLevel::state_run;
         }
     }
+
+    // maybe we shall add a state for machine homing
 
     fn state_run(&mut self, data: &mut DomainData) {
         self.machine.react(data);
@@ -70,24 +80,31 @@ impl MachineRunnerFsm {
             last_input: 0,
             op_pressed_count: 0,
             state: MachineRunnerFsm::state_manual,
+            feeder1st: Default::default(),
+            feeder2nd: Default::default(),
+            feeder3rd: Default::default(),
         }
     }
 
     fn react(&mut self, data: &mut DomainData) {
         // check if the input is dirty
-        let input = data.digital_inputs & MODE_SWITCH_BIT;
-        let last_input = data.digital_outputs & MODE_SWITCH_BIT;
+        let input = data.digital_inputs;
+        let last_input = self.last_input;
 
-        if input != last_input {
+        if (input ^ last_input) & MODE_SWITCH_BIT != 0 {
             if input & MODE_SWITCH_BIT != 0 {
                 // mode switch
+                log::debug!("mode switch auto");
                 self.state = MachineRunnerFsm::state_auto;
             } else {
+                log::debug!("mode switch manual");
                 self.state = MachineRunnerFsm::state_manual;
             }
         } else {
             (self.state)(self, data);
         }
+
+        self.last_input = input;
     }
 
     fn state_auto(&mut self, data: &mut DomainData) {
@@ -120,5 +137,19 @@ impl MachineRunnerFsm {
 
     fn run_once(&mut self, data: &mut DomainData) {
         // run feeder1st, feeder2nd, feeder3rd
+
+        // to suppress warning for the packed struct
+        let d_in = data.digital_inputs;
+        let d_out_1st = self.feeder1st.update(data.digital_inputs);
+
+        let (d_out2nd, servo0_rx_pdo) = self.feeder2nd.update(data.servos[0].tx, d_in);
+
+        let (d_out3rd, servo1_rx_pdo) = self.feeder3rd.update(data.servos[1].tx, d_in);
+
+        let d_out = (d_out_1st) | (d_out2nd) | (d_out3rd);
+
+        data.digital_outputs = d_out;
+        data.servos[0].rx = servo0_rx_pdo;
+        data.servos[1].rx = *servo1_rx_pdo;
     }
 }

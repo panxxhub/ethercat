@@ -1,10 +1,12 @@
 #[repr(C, packed)]
+#[derive(Clone, Copy)]
 pub(crate) struct ServoTxPdo {
     pub status_word: u16,
     pub position_actual_value: i32,
 }
 
 #[repr(C, packed)]
+#[derive(Default, Clone, Copy)]
 pub(crate) struct ServoRxPdo {
     pub control_word: u16,
     pub target_position: i32,

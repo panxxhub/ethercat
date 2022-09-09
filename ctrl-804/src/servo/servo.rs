@@ -14,8 +14,8 @@ const STATUS_FAULT_BIT: u16 = 0x0008;
 const STATUS_VOLTAGE_ENABLED_BIT: u16 = 0x0010;
 const STATUS_QUICK_STOP_BIT: u16 = 0x0020;
 
-const FEEDER_1ST_IN_BIT_MASK: u16 = 0x0001;
-const FEEDER_1ST_OUT_BIT: u16 = 0x0020;
+// const FEEDER_1ST_IN_BIT_MASK: u16 = 0x0001;
+// const FEEDER_1ST_OUT_BIT: u16 = 0x0020;
 
 const PROFILE_VELOCITY: u32 = 139810133_u32; //1000_u32 * (1 << 23) / 60; // 1000 rpm -> puu/s
 const PROFILE_DECELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.42) as u32; // 0.42s to stop
@@ -27,8 +27,6 @@ const STATUS_SET_POINT_BIT: u16 = 0x0800;
 const STATUS_TARGET_REACHED_BIT: u16 = 0x0200;
 
 pub const PDO_SIZE: usize = std::mem::size_of::<ServoRxPdo>() + std::mem::size_of::<ServoTxPdo>();
-pub const RX_PDO_SIZE: usize = std::mem::size_of::<ServoRxPdo>();
-pub const TX_PDO_SIZE: usize = std::mem::size_of::<ServoTxPdo>();
 
 use super::servo_pdo::{ServoPdo, ServoRxPdo, ServoTxPdo};
 
@@ -65,6 +63,8 @@ impl ServoInitializerFsm {
         rx.control_word = 0;
         rx.target_position = 0;
         rx.profile_velocity = 0;
+        rx.profile_acceleration = 0;
+        rx.profile_deceleration = 0;
         rx.mode_of_operation = 0;
         false
     }
@@ -74,6 +74,10 @@ impl ServoInitializerFsm {
             self.state = ServoInitializerFsm::fsm_state_ready_to_switch_on;
         }
         rx.control_word = CTRL_FAULT_REST_BIT;
+        rx.target_position = 0;
+        rx.profile_velocity = 0;
+        rx.profile_acceleration = 0;
+        rx.profile_deceleration = 0;
         rx.mode_of_operation = 0;
         false
     }
@@ -86,6 +90,12 @@ impl ServoInitializerFsm {
             self.state = ServoInitializerFsm::fsm_state_switch_on;
         }
         rx.control_word = CTRL_WORD;
+
+        rx.target_position = 0;
+        rx.profile_velocity = 0;
+        rx.profile_acceleration = 0;
+        rx.profile_deceleration = 0;
+
         rx.mode_of_operation = MODE_OP_PP;
         false
     }
@@ -103,6 +113,12 @@ impl ServoInitializerFsm {
             self.state = ServoInitializerFsm::fsm_state_enable_operation;
         }
         rx.control_word = CTRL_WORD;
+
+        rx.target_position = 0;
+        rx.profile_velocity = 0;
+        rx.profile_acceleration = 0;
+        rx.profile_deceleration = 0;
+
         rx.mode_of_operation = MODE_OP_PP;
         false
     }
@@ -124,6 +140,12 @@ impl ServoInitializerFsm {
             self.state = ServoInitializerFsm::fsm_state_operation_enabled;
         }
         rx.control_word = CTRL_WORD;
+
+        rx.target_position = 0;
+        rx.profile_velocity = 0;
+        rx.profile_acceleration = 0;
+        rx.profile_deceleration = 0;
+
         rx.mode_of_operation = MODE_OP_PP;
         false
     }
@@ -135,6 +157,12 @@ impl ServoInitializerFsm {
             | CTRL_ENABLE_OPERATION_BIT;
 
         rx.control_word = CTRL_WORD;
+
+        rx.target_position = 0;
+        rx.profile_velocity = 0;
+        rx.profile_acceleration = 0;
+        rx.profile_deceleration = 0;
+
         rx.mode_of_operation = MODE_OP_PP;
         true
     }
@@ -155,7 +183,7 @@ struct ServoMoverFsm {
     state: fn(
         &mut ServoMoverFsm,
         target_pos: i32,
-        servo_tx: &ServoTxPdo,
+        servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool,
 }
@@ -169,8 +197,11 @@ impl ServoMover {
             },
         }
     }
+    // pub fn reset(&mut self) {
+    //     self.fsm.state = ServoMoverFsm::fsm_state_servo_mover_init;
+    // }
 
-    pub fn update(&mut self, servo_tx: &ServoTxPdo, servo_rx: &mut ServoRxPdo) -> bool {
+    pub fn update(&mut self, servo_tx: ServoTxPdo, servo_rx: &mut ServoRxPdo) -> bool {
         (self.fsm.state)(&mut self.fsm, self.target_position, servo_tx, servo_rx)
     }
 }
@@ -185,7 +216,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_mover_init(
         &mut self,
         target_pos: i32,
-        servo_tx: &ServoTxPdo,
+        servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
         if (servo_tx.position_actual_value - target_pos).abs() < 14200 {
@@ -209,7 +240,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_profile(
         &mut self,
         target_pos: i32,
-        _servo_tx: &ServoTxPdo,
+        _servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
         servo_rx.control_word = 0x000F;
@@ -227,7 +258,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_trigger_new_set_point(
         &mut self,
         target_pos: i32,
-        servo_tx: &ServoTxPdo,
+        servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
         if servo_tx.status_word & STATUS_SET_POINT_BIT == STATUS_SET_POINT_BIT {
@@ -246,7 +277,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_wait_for_target_reached(
         &mut self,
         target_pos: i32,
-        servo_tx: &ServoTxPdo,
+        servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
         servo_rx.control_word = 0x000F;

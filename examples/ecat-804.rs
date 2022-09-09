@@ -73,13 +73,13 @@ const SLAVE_SETTINGS: [SlaveSetting; 3] = [
         slave_type: SlaveType::Servo,
     },
     SlaveSetting {
-        slave_pos_u16: 1,
+        slave_pos_u16: 2,
         vendor_id: 0x066F_u32,
         product_code: 0x6038_0006_u32,
         slave_type: SlaveType::Servo,
     },
     SlaveSetting {
-        slave_pos_u16: 2,
+        slave_pos_u16: 1,
         vendor_id: 0x0A09_u32,
         product_code: 0x0000_2200_u32,
         slave_type: SlaveType::DigitalIO,
