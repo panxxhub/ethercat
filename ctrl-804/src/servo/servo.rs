@@ -30,37 +30,38 @@ pub const PDO_SIZE: usize = std::mem::size_of::<ServoRxPdo>() + std::mem::size_o
 pub const RX_PDO_SIZE: usize = std::mem::size_of::<ServoRxPdo>();
 pub const TX_PDO_SIZE: usize = std::mem::size_of::<ServoTxPdo>();
 
-use super::servo_pdo::{ServoRxPdo, ServoTxPdo};
+use super::servo_pdo::{ServoPdo, ServoRxPdo, ServoTxPdo};
 
 #[derive(Default)]
-pub(crate) struct Servo {
-    pub fsm: ServoFSM,
+pub(crate) struct ServoInitializer {
+    pub fsm: ServoInitializerFsm,
 }
 
-pub(crate) struct ServoFSM {
-    state: fn(&mut ServoFSM, &ServoTxPdo, &mut ServoRxPdo) -> bool,
+pub(crate) struct ServoInitializerFsm {
+    state: fn(&mut ServoInitializerFsm, &ServoTxPdo, &mut ServoRxPdo) -> bool,
 }
 
-impl Servo {
-    pub fn update(&mut self, pdo: &mut [u8; PDO_SIZE]) -> bool {
-        // transmute
-        use std::mem::transmute;
-        let tx_pdo: &ServoTxPdo = unsafe { transmute(pdo[RX_PDO_SIZE..].as_ptr()) };
-        let rx_pdo: &mut ServoRxPdo = unsafe { transmute(pdo[..RX_PDO_SIZE].as_mut_ptr()) };
-        (self.fsm.state)(&mut self.fsm, tx_pdo, rx_pdo)
+impl ServoInitializer {
+    pub(crate) fn new() -> Self {
+        Self {
+            fsm: ServoInitializerFsm::new(),
+        }
+    }
+
+    pub fn update(&mut self, pdo: &mut ServoPdo) -> bool {
+        (self.fsm.state)(&mut self.fsm, &pdo.tx, &mut pdo.rx)
     }
 }
 
-impl ServoFSM {
-    /// Creates a new [`ServoFSM`].
+impl ServoInitializerFsm {
     pub fn new() -> Self {
         Self {
-            state: ServoFSM::fsm_state_start,
+            state: ServoInitializerFsm::fsm_state_start,
         }
     }
 
     fn fsm_state_start(&mut self, _tx: &ServoTxPdo, rx: &mut ServoRxPdo) -> bool {
-        self.state = ServoFSM::fsm_state_fault_reset;
+        self.state = ServoInitializerFsm::fsm_state_fault_reset;
         rx.control_word = 0;
         rx.target_position = 0;
         rx.profile_velocity = 0;
@@ -70,7 +71,7 @@ impl ServoFSM {
 
     fn fsm_state_fault_reset(&mut self, tx: &ServoTxPdo, rx: &mut ServoRxPdo) -> bool {
         if tx.status_word & STATUS_FAULT_BIT == 0 {
-            self.state = ServoFSM::fsm_state_ready_to_switch_on;
+            self.state = ServoInitializerFsm::fsm_state_ready_to_switch_on;
         }
         rx.control_word = CTRL_FAULT_REST_BIT;
         rx.mode_of_operation = 0;
@@ -82,7 +83,7 @@ impl ServoFSM {
         const CONDITION: u16 = STATUS_QUICK_STOP_BIT | STATUS_READY_TO_SWITCH_ON_BIT;
         const CTRL_WORD: u16 = CTRL_QUICK_STOP_BIT | CTRL_ENABLE_VOLTAGE_BIT;
         if tx.status_word & CONDITION == CONDITION {
-            self.state = ServoFSM::fsm_state_switch_on;
+            self.state = ServoInitializerFsm::fsm_state_switch_on;
         }
         rx.control_word = CTRL_WORD;
         rx.mode_of_operation = MODE_OP_PP;
@@ -99,7 +100,7 @@ impl ServoFSM {
         const CTRL_WORD: u16 = CTRL_QUICK_STOP_BIT | CTRL_ENABLE_VOLTAGE_BIT | CTRL_SWITCH_ON_BIT;
 
         if tx.status_word & CONDITION == CONDITION {
-            self.state = ServoFSM::fsm_state_enable_operation;
+            self.state = ServoInitializerFsm::fsm_state_enable_operation;
         }
         rx.control_word = CTRL_WORD;
         rx.mode_of_operation = MODE_OP_PP;
@@ -120,7 +121,7 @@ impl ServoFSM {
             | CTRL_ENABLE_OPERATION_BIT;
 
         if tx.status_word & CONDITION == CONDITION {
-            self.state = ServoFSM::fsm_state_operation_enabled;
+            self.state = ServoInitializerFsm::fsm_state_operation_enabled;
         }
         rx.control_word = CTRL_WORD;
         rx.mode_of_operation = MODE_OP_PP;
@@ -139,7 +140,7 @@ impl ServoFSM {
     }
 }
 
-impl Default for ServoFSM {
+impl Default for ServoInitializerFsm {
     fn default() -> Self {
         Self::new()
     }
@@ -270,12 +271,14 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut servo: Servo = Default::default();
+        let mut servo: ServoInitializer = Default::default();
         let mut v: [u8; PDO_SIZE] = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 129, 212, 253, 254, 80, 2,
         ];
+        use std::mem::transmute;
+        let mut servo_pdo: &mut ServoPdo = unsafe { transmute(v.as_mut_ptr()) };
 
-        assert_eq!(servo.update(&mut v), false);
-        assert_eq!(servo.update(&mut v), false);
+        assert_eq!(servo.update(servo_pdo), false);
+        assert_eq!(servo.update(servo_pdo), false);
     }
 }

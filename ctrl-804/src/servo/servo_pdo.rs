@@ -13,3 +13,9 @@ pub(crate) struct ServoRxPdo {
     pub profile_deceleration: u32,
     pub mode_of_operation: u8,
 }
+
+#[repr(C, packed)]
+pub(crate) struct ServoPdo {
+    pub rx: ServoRxPdo,
+    pub tx: ServoTxPdo,
+}
