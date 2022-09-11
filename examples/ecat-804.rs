@@ -16,7 +16,7 @@ pub async fn main() -> Result<(), std::io::Error> {
     // spawn a task to cyclically read data from the EtherCAT master
 
     let handle = tokio::spawn(async move {
-        let cycle_time = Duration::from_micros(25_000);
+        let cycle_time = Duration::from_micros(2_000);
         let mut next_cycle = Instant::now() + cycle_time;
         // let mut servo: Servo = Default::default();
         let mut top_level: TopLevel = Default::default();

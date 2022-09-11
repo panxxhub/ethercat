@@ -1,5 +1,5 @@
 pub(crate) const FEEDER_1ST_IN_BIT_MASK: u16 = 0x0001;
-pub(crate) const FEEDER_1ST_OUT_BIT: u16 = 0x0020;
+pub(crate) const FEEDER_1ST_OUT_BIT: u16 = 0x8000;
 
 pub(crate) struct Feeder1st {
     fsm: Feeder1stFsm,

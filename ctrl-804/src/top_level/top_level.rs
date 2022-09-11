@@ -112,7 +112,8 @@ impl MachineRunnerFsm {
         let input = data.digital_inputs;
         let last_input = self.last_input;
 
-        if (input ^ last_input) & OP_BUTTON_BIT != 0 {
+        // rising edge
+        if ((input ^ last_input) & OP_BUTTON_BIT != 0) && (input & OP_BUTTON_BIT != 0) {
             self.op_pressed_count += 1;
         }
 
@@ -127,7 +128,8 @@ impl MachineRunnerFsm {
         let input = data.digital_inputs;
         let last_input = self.last_input;
 
-        if (input ^ last_input) & OP_BUTTON_BIT != 0 {
+        // rising edge
+        if ((input ^ last_input) & OP_BUTTON_BIT != 0) && (input & OP_BUTTON_BIT != 0) {
             // execute machine
             self.run_once(data);
         }
@@ -140,16 +142,23 @@ impl MachineRunnerFsm {
 
         // to suppress warning for the packed struct
         let d_in = data.digital_inputs;
-        let d_out_1st = self.feeder1st.update(data.digital_inputs);
 
-        let (d_out2nd, servo0_rx_pdo) = self.feeder2nd.update(data.servos[0].tx, d_in);
-
-        let (d_out3rd, servo1_rx_pdo) = self.feeder3rd.update(data.servos[1].tx, d_in);
+        let d_out_1st = self.feeder1st.update(d_in);
+        let (d_out2nd, servo0_rx_pdo, trigger_2nd) = self.feeder2nd.update(data.servos[0].tx, d_in);
+        let (d_out3rd, servo1_rx_pdo, trigger_3rd) = self.feeder3rd.update(data.servos[1].tx, d_in);
 
         let d_out = (d_out_1st) | (d_out2nd) | (d_out3rd);
+        // let d_out = d_out3rd;
 
         data.digital_outputs = d_out;
-        data.servos[0].rx = servo0_rx_pdo;
+        data.servos[0].rx = *servo0_rx_pdo;
         data.servos[1].rx = *servo1_rx_pdo;
+
+        if trigger_2nd {
+            self.feeder3rd.trigger_next(); // log::debug!("trigger 2nd");
+        }
+        if trigger_3rd {
+            self.feeder2nd.trigger_next(); // log::debug!("trigger 3rd");
+        }
     }
 }
