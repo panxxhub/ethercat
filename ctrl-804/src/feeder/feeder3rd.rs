@@ -70,6 +70,7 @@ impl Feeder3rdFsm {
         self.servo_mover.set_target(FEEDER_3RD_POS_03);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_start_pending;
+            self.d_out |= CLIP_01_BIT;
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -80,11 +81,10 @@ impl Feeder3rdFsm {
         _d_in: u16,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.next_trigger {
-            self.servo_mover.set_target(FEEDER_3RD_POS_04);
             self.state = Feeder3rdFsm::fsm_state_start_move_04;
+            self.servo_mover.set_target(FEEDER_3RD_POS_04);
             self.next_trigger = false;
         }
-        self.d_out |= CLIP_01_BIT;
         (self.d_out, &self.rx_pdo, false)
     }
 

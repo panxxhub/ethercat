@@ -73,7 +73,6 @@ impl Feeder2ndFsm {
     fn fsm_state_init(&mut self, servo_tx: ServoTxPdo, _d_in: u16) -> (u16, &ServoRxPdo, bool) {
         // let mut servo_rx: ServoRxPdo = self.last_servo_rx;
         self.d_out |= FEEDER_2ND_OUT_BIT_BKR;
-
         self.servo_mover.set_target(FEEDER_2ND_POS_START);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder2ndFsm::fsm_state_start_pending;
@@ -86,9 +85,10 @@ impl Feeder2ndFsm {
         _servo_tx: ServoTxPdo,
         d_in: u16,
     ) -> (u16, &ServoRxPdo, bool) {
-        self.d_out &= !FEEDER_2ND_OUT_BIT_BKR;
+        // self.d_out &= !FEEDER_2ND_OUT_BIT_BKR;
         if (d_in & FEEDER_SENSOR_BIT_1) > 0 || (d_in & FEEDER_SENSOR_BIT_2 == 0) {
             self.state = Feeder2ndFsm::fsm_state_start_kick_01;
+            self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_1;
             self.kicker_count = 350;
         }
         (self.d_out, &self.rx_pdo, false)
@@ -102,9 +102,9 @@ impl Feeder2ndFsm {
         self.kicker_count -= 1;
         if self.kicker_count == 0 {
             self.state = Feeder2ndFsm::fsm_state_start_kick_02;
+            self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_2;
             self.kicker_count = 350;
         }
-        self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_1;
         (self.d_out, &self.rx_pdo, false)
     }
 
@@ -116,9 +116,11 @@ impl Feeder2ndFsm {
         self.kicker_count -= 1;
         if self.kicker_count == 0 {
             self.state = Feeder2ndFsm::fsm_state_start_kick_03;
-            self.kicker_count = 1000;
+            self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK)
+                | FEEDER_2ND_OUT_BIT_2
+                | FEEDER_2ND_OUT_BIT_3;
+            self.kicker_count = 350;
         }
-        self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_2;
         (self.d_out, &self.rx_pdo, false)
     }
 
@@ -129,29 +131,25 @@ impl Feeder2ndFsm {
     ) -> (u16, &ServoRxPdo, bool) {
         self.kicker_count -= 1;
         if self.kicker_count == 0 {
-            self.state = Feeder2ndFsm::fsm_state_start_move;
-            self.kicker_count = 80;
+            self.state = Feeder2ndFsm::fsm_state_move_to_end;
+            self.servo_mover.set_target(FEEDER_2ND_POS_END);
+            self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_BKR;
         }
-        self.d_out =
-            (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_2 | FEEDER_2ND_OUT_BIT_3;
         (self.d_out, &self.rx_pdo, false)
     }
 
-    fn fsm_state_start_move(
+    fn fsm_state_move_to_end(
         &mut self,
         servo_tx: ServoTxPdo,
         _d_in: u16,
     ) -> (u16, &ServoRxPdo, bool) {
         // todo: shall we check feeder 3rd position?
-        self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_BKR;
-
-        self.servo_mover.set_target(FEEDER_2ND_POS_END);
-
-        if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
+        let target_reached = self.servo_mover.update(servo_tx, &mut self.rx_pdo);
+        if target_reached {
             self.state = Feeder2ndFsm::fsm_state_end_pending;
         }
 
-        (self.d_out, &self.rx_pdo, false)
+        (self.d_out, &self.rx_pdo, target_reached)
     }
 
     /// .Wait for the feeder 3rd to take the part
@@ -161,21 +159,19 @@ impl Feeder2ndFsm {
         _d_in: u16,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.next_trigger {
-            self.state = Feeder2ndFsm::fsm_state_end_move_2_start;
+            self.state = Feeder2ndFsm::fsm_state_move_to_start;
+            self.servo_mover.set_target(FEEDER_2ND_POS_START);
+            self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_BKR;
             self.next_trigger = false;
         }
-        (self.d_out, &self.rx_pdo, true)
+        (self.d_out, &self.rx_pdo, false)
     }
 
-    fn fsm_state_end_move_2_start(
+    fn fsm_state_move_to_start(
         &mut self,
         servo_tx: ServoTxPdo,
-        // servo_rx: &mut ServoRxPdo,
-        _d_in: u16, // d_out: &mut [u8; 2],
+        _d_in: u16,
     ) -> (u16, &ServoRxPdo, bool) {
-        self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_BKR;
-
-        self.servo_mover.set_target(FEEDER_2ND_POS_START);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder2ndFsm::fsm_state_start_pending;
         }
