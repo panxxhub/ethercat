@@ -1,5 +1,5 @@
 {
-	"editor.fontFamily": "'Jetbrains Mono', 'Inconsolata', 'Cascadia Code', 'Inconsolata NF', 'Fira Code', Consolas, 'Courier New', monospace",
+	"editor.fontFamily": "'Cascadia Code', 'Jetbrains Mono', 'Inconsolata', 'Inconsolata NF', 'Fira Code', Consolas, 'Courier New', monospace",
 	"editor.fontLigatures": true,
 	"editor.fontSize": 15,
 	"editor.semanticHighlighting.enabled": true,
@@ -11,7 +11,7 @@
 	"editor.bracketPairColorization.enabled": true,
 	"editor.codeLens": true,
 	"editor.codeLensFontFamily": "'Jetbrains Mono', Consolas, 'Courier New', monospace",
-	"workbench.colorTheme": "Dracula Soft",
+	"workbench.colorTheme": "GitHub Dark",
 	"terminal.integrated.fontFamily": "Hasklug NF",
 	"terminal.integrated.env.linux": {
 		"ETHERCAT_PATH": "/home/pan/ethercat_ws/igh",
@@ -19,6 +19,7 @@
 	"editor.semanticTokenColorCustomizations": {
 		"rules": {
 			"*.mutable": {
+				"foreground": "#00ff8f",
 				"fontStyle": "underline"
 			},
 			"*.async": {
@@ -34,7 +35,8 @@
 			"*.function": {
 				"fontStyle": "bold"
 			},
-		}
+		},
+		"enabled": true
 	},
 	"cSpell.words": [
 		"minigrep",

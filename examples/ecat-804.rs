@@ -1,10 +1,9 @@
-use std::{collections::HashMap, convert::TryFrom, io};
-
 use ctrl_804::top_level::top_level::{DomainData, TopLevel};
 use ethercat::{
     AlState, DomainIdx, Idx, Master, MasterAccess, Offset, PdoCfg, PdoEntryIdx, PdoEntryInfo,
     PdoEntryPos, PdoIdx, SlaveAddr, SlaveId, SlavePos, SmCfg, SubIdx,
 };
+use std::{collections::HashMap, convert::TryFrom, io};
 use tokio::time::{sleep_until, Duration, Instant};
 
 #[tokio::main]
@@ -14,7 +13,6 @@ pub async fn main() -> Result<(), std::io::Error> {
     let (mut master, domain_idx) = init_master()?;
 
     // spawn a task to cyclically read data from the EtherCAT master
-
     let handle = tokio::spawn(async move {
         let cycle_time = Duration::from_micros(2_000);
         let mut next_cycle = Instant::now() + cycle_time;
