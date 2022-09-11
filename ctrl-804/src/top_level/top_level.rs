@@ -118,7 +118,7 @@ impl MachineRunnerFsm {
         }
 
         if self.op_pressed_count % 2 == 0 {
-            self.run_once(data);
+            self.run_once(data, false);
         }
         self.last_input = input;
     }
@@ -131,21 +131,23 @@ impl MachineRunnerFsm {
         // rising edge
         if ((input ^ last_input) & OP_BUTTON_BIT != 0) && (input & OP_BUTTON_BIT != 0) {
             // execute machine
-            self.run_once(data);
+            self.run_once(data, true);
         }
 
         self.last_input = input;
     }
 
-    fn run_once(&mut self, data: &mut DomainData) {
+    fn run_once(&mut self, data: &mut DomainData, is_manual: bool) {
         // run feeder1st, feeder2nd, feeder3rd
 
         // to suppress warning for the packed struct
         let d_in = data.digital_inputs;
 
         let d_out1st = self.feeder1st.update(d_in);
-        let (d_out2nd, servo0_rx_pdo, trigger_3rd) = self.feeder2nd.update(data.servos[0].tx, d_in);
-        let (d_out3rd, servo1_rx_pdo, trigger_2nd) = self.feeder3rd.update(data.servos[1].tx, d_in);
+        let (d_out2nd, servo0_rx_pdo, trigger_3rd) =
+            self.feeder2nd.update(data.servos[0].tx, d_in, is_manual);
+        let (d_out3rd, servo1_rx_pdo, trigger_2nd) =
+            self.feeder3rd.update(data.servos[1].tx, d_in, is_manual);
 
         let d_out = (d_out1st) | (d_out2nd) | (d_out3rd);
 

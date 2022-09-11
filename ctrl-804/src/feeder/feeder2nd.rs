@@ -27,8 +27,13 @@ impl Feeder2nd {
         }
     }
 
-    pub(crate) fn update(&mut self, servo_tx: ServoTxPdo, d_in: u16) -> (u16, &ServoRxPdo, bool) {
-        (self.fsm.state)(&mut self.fsm, servo_tx, d_in)
+    pub(crate) fn update(
+        &mut self,
+        servo_tx: ServoTxPdo,
+        d_in: u16,
+        is_manual: bool,
+    ) -> (u16, &ServoRxPdo, bool) {
+        (self.fsm.state)(&mut self.fsm, servo_tx, d_in, is_manual)
     }
 
     pub(crate) fn trigger_next(&mut self) {
@@ -45,7 +50,12 @@ impl Default for Feeder2nd {
 struct Feeder2ndFsm {
     kicker_count: u32,
     next_trigger: bool,
-    state: fn(&mut Feeder2ndFsm, servo_tx: ServoTxPdo, d_in: u16) -> (u16, &ServoRxPdo, bool),
+    state: fn(
+        &mut Feeder2ndFsm,
+        servo_tx: ServoTxPdo,
+        d_in: u16,
+        is_manual: bool,
+    ) -> (u16, &ServoRxPdo, bool),
     servo_mover: ServoMover,
     d_out: u16,
     rx_pdo: ServoRxPdo,
@@ -70,7 +80,12 @@ impl Feeder2ndFsm {
         }
     }
 
-    fn fsm_state_init(&mut self, servo_tx: ServoTxPdo, _d_in: u16) -> (u16, &ServoRxPdo, bool) {
+    fn fsm_state_init(
+        &mut self,
+        servo_tx: ServoTxPdo,
+        _d_in: u16,
+        _is_manual: bool,
+    ) -> (u16, &ServoRxPdo, bool) {
         // let mut servo_rx: ServoRxPdo = self.last_servo_rx;
         self.d_out |= FEEDER_2ND_OUT_BIT_BKR;
         self.servo_mover.set_target(FEEDER_2ND_POS_START);
@@ -84,12 +99,13 @@ impl Feeder2ndFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         // self.d_out &= !FEEDER_2ND_OUT_BIT_BKR;
         if (d_in & FEEDER_SENSOR_BIT_1) > 0 || (d_in & FEEDER_SENSOR_BIT_2 == 0) {
             self.state = Feeder2ndFsm::fsm_state_start_kick_01;
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_1;
-            self.kicker_count = 350;
+            self.kicker_count = if is_manual { 1 } else { 350 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -98,12 +114,13 @@ impl Feeder2ndFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kicker_count -= 1;
         if self.kicker_count == 0 {
             self.state = Feeder2ndFsm::fsm_state_start_kick_02;
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_2;
-            self.kicker_count = 350;
+            self.kicker_count = if is_manual { 1 } else { 350 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -112,6 +129,7 @@ impl Feeder2ndFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kicker_count -= 1;
         if self.kicker_count == 0 {
@@ -119,7 +137,7 @@ impl Feeder2ndFsm {
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK)
                 | FEEDER_2ND_OUT_BIT_2
                 | FEEDER_2ND_OUT_BIT_3;
-            self.kicker_count = 350;
+            self.kicker_count = if is_manual { 1 } else { 350 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -128,6 +146,7 @@ impl Feeder2ndFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kicker_count -= 1;
         if self.kicker_count == 0 {
@@ -142,13 +161,13 @@ impl Feeder2ndFsm {
         &mut self,
         servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         // todo: shall we check feeder 3rd position?
         let target_reached = self.servo_mover.update(servo_tx, &mut self.rx_pdo);
         if target_reached {
             self.state = Feeder2ndFsm::fsm_state_end_pending;
         }
-
         (self.d_out, &self.rx_pdo, target_reached)
     }
 
@@ -157,6 +176,7 @@ impl Feeder2ndFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.next_trigger {
             self.state = Feeder2ndFsm::fsm_state_move_to_start;
@@ -171,6 +191,7 @@ impl Feeder2ndFsm {
         &mut self,
         servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder2ndFsm::fsm_state_start_pending;

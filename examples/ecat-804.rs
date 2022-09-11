@@ -26,14 +26,12 @@ pub async fn main() -> Result<(), std::io::Error> {
             master.domain(domain_idx).process().unwrap();
             let m_state = master.state().unwrap();
             // let _d_state = master.domain(domain_idx).state();
-            // log::debug!("Master state: {:?}", m_state);
-            // log::debug!("Domain state: {:?}", d_state);
             if m_state.link_up && AlState::try_from(m_state.al_states).unwrap() == AlState::Op {
                 // do something with the data
                 let raw_data: &mut [u8] = master.domain_data(domain_idx).unwrap();
                 use std::mem::transmute;
                 let raw_data_fixed: &mut DomainData = unsafe { transmute(raw_data.as_mut_ptr()) };
-                cyclic_work(&mut top_level, raw_data_fixed);
+                top_level.react(raw_data_fixed);
             }
             master.domain(domain_idx).queue().unwrap();
             master.send().unwrap();
@@ -47,10 +45,6 @@ pub async fn main() -> Result<(), std::io::Error> {
     handle.await.unwrap();
 
     Ok(())
-}
-
-fn cyclic_work(top_level: &mut TopLevel, domain_data: &mut DomainData) {
-    top_level.react(domain_data)
 }
 
 enum SlaveType {

@@ -19,7 +19,8 @@ pub(crate) struct Feeder3rd {
 struct Feeder3rdFsm {
     kick_count: u32,
     next_trigger: bool,
-    state: fn(&mut Self, servo_tx: ServoTxPdo, d_in: u16) -> (u16, &ServoRxPdo, bool),
+    state:
+        fn(&mut Self, servo_tx: ServoTxPdo, d_in: u16, is_manual: bool) -> (u16, &ServoRxPdo, bool),
     servo_mover: ServoMover,
 
     d_out: u16,
@@ -33,8 +34,13 @@ impl Feeder3rd {
         }
     }
 
-    pub(crate) fn update(&mut self, servo_tx: ServoTxPdo, d_in: u16) -> (u16, &ServoRxPdo, bool) {
-        (self.fsm.state)(&mut self.fsm, servo_tx, d_in)
+    pub(crate) fn update(
+        &mut self,
+        servo_tx: ServoTxPdo,
+        d_in: u16,
+        is_manual: bool,
+    ) -> (u16, &ServoRxPdo, bool) {
+        (self.fsm.state)(&mut self.fsm, servo_tx, d_in, is_manual)
     }
     pub(crate) fn trigger_next(&mut self) {
         self.fsm.next_trigger = true;
@@ -66,7 +72,12 @@ impl Feeder3rdFsm {
         }
     }
 
-    fn fsm_state_init(&mut self, servo_tx: ServoTxPdo, _d_in: u16) -> (u16, &ServoRxPdo, bool) {
+    fn fsm_state_init(
+        &mut self,
+        servo_tx: ServoTxPdo,
+        _d_in: u16,
+        _is_manual: bool,
+    ) -> (u16, &ServoRxPdo, bool) {
         self.servo_mover.set_target(FEEDER_3RD_POS_03);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_start_pending;
@@ -79,6 +90,7 @@ impl Feeder3rdFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.next_trigger {
             self.state = Feeder3rdFsm::fsm_state_start_move_04;
@@ -92,11 +104,12 @@ impl Feeder3rdFsm {
         &mut self,
         servo_tx: ServoTxPdo,
         _d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_start_move_04_clip;
             self.d_out &= !CLIP_01_BIT; // toggle off clip, open clip
-            self.kick_count = 200;
+            self.kick_count = if is_manual { 1 } else { 200 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -105,12 +118,12 @@ impl Feeder3rdFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kick_count -= 1;
         if self.kick_count == 0 {
             self.state = Feeder3rdFsm::fsm_state_start_move_01;
             self.servo_mover.set_target(FEEDER_3RD_POS_01);
-            self.kick_count = 0;
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -119,6 +132,7 @@ impl Feeder3rdFsm {
         &mut self,
         servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_pos_1_holding;
@@ -130,12 +144,13 @@ impl Feeder3rdFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         #[cfg(feature = "sensor_3")]
         {
             if d_in & SENSOR_3 != 0 {
                 self.state = Feeder3rdFsm::fsm_state_pos_1_to_take_part;
-                self.kick_count = 200;
+                self.kick_count = if is_manual { 1 } else { 200 };
                 self.d_out |= CLIP_02_BIT;
             }
         }
@@ -143,7 +158,7 @@ impl Feeder3rdFsm {
         #[cfg(not(feature = "sensor_3"))]
         {
             self.state = Feeder3rdFsm::fsm_state_pos_1_kick;
-            self.kick_count = 200;
+            self.kick_count = if is_manual { 1 } else { 200 };
             self.d_out |= CLIP_02_BIT;
         }
 
@@ -154,6 +169,7 @@ impl Feeder3rdFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kick_count -= 1;
         if self.kick_count == 0 {
@@ -167,11 +183,12 @@ impl Feeder3rdFsm {
         &mut self,
         servo_tx: ServoTxPdo,
         _d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             // target reached
             self.state = Feeder3rdFsm::fsm_state_02_release;
-            self.kick_count = 200;
+            self.kick_count = if is_manual { 1 } else { 200 };
             self.d_out |= CLIP_01_BIT;
         }
         (self.d_out, &self.rx_pdo, false)
@@ -181,12 +198,13 @@ impl Feeder3rdFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kick_count -= 1;
         if self.kick_count == 0 {
             self.servo_mover.set_target(FEEDER_3RD_POS_01);
             self.state = Feeder3rdFsm::fsm_state_pos_01_empty;
-            self.kick_count = 300;
+            self.kick_count = if is_manual { 1 } else { 300 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -195,13 +213,14 @@ impl Feeder3rdFsm {
         &mut self,
         servo_tx: ServoTxPdo,
         _d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if self.kick_count > 0 {
             self.kick_count -= 1;
         } else {
             if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
                 self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_1;
-                self.kick_count = 200;
+                self.kick_count = if is_manual { 1 } else { 200 };
             }
         }
         (self.d_out, &self.rx_pdo, false)
@@ -211,12 +230,13 @@ impl Feeder3rdFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kick_count -= 1;
         if self.kick_count == 0 {
             self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_2;
             self.d_out = 0;
-            self.kick_count = 300;
+            self.kick_count = if is_manual { 1 } else { 300 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -225,6 +245,7 @@ impl Feeder3rdFsm {
         &mut self,
         _servo_tx: ServoTxPdo,
         _d_in: u16,
+        _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kick_count -= 1;
         if self.kick_count == 0 {
