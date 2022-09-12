@@ -33,6 +33,9 @@ impl Feeder2nd {
         d_in: u16,
         is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
+        if d_in & FEEDER_SENSOR_BIT_2 != 0 {
+            self.fsm.toggle_product_passed();
+        }
         (self.fsm.state)(&mut self.fsm, servo_tx, d_in, is_manual)
     }
 
@@ -50,6 +53,7 @@ impl Default for Feeder2nd {
 struct Feeder2ndFsm {
     kicker_count: u32,
     next_trigger: bool,
+    product_passed: bool,
     state: fn(
         &mut Feeder2ndFsm,
         servo_tx: ServoTxPdo,
@@ -66,6 +70,7 @@ impl Feeder2ndFsm {
         Feeder2ndFsm {
             kicker_count: 0,
             next_trigger: false,
+            product_passed: false,
             state: Feeder2ndFsm::fsm_state_init,
             servo_mover: Default::default(),
             d_out: FEEDER_2ND_OUT_BIT_BKR, // we start with the breaker on
@@ -78,6 +83,10 @@ impl Feeder2ndFsm {
                 mode_of_operation: 1,
             },
         }
+    }
+
+    fn toggle_product_passed(&mut self) {
+        self.product_passed = false;
     }
 
     fn fsm_state_init(
@@ -102,10 +111,11 @@ impl Feeder2ndFsm {
         is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         // self.d_out &= !FEEDER_2ND_OUT_BIT_BKR;
-        if (d_in & FEEDER_SENSOR_BIT_1) > 0 || (d_in & FEEDER_SENSOR_BIT_2 == 0) {
+        if (d_in & FEEDER_SENSOR_BIT_1) > 0 || self.product_passed {
             self.state = Feeder2ndFsm::fsm_state_start_kick_01;
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_1;
             self.kicker_count = if is_manual { 1 } else { 350 };
+            self.product_passed = false;
         }
         (self.d_out, &self.rx_pdo, false)
     }
