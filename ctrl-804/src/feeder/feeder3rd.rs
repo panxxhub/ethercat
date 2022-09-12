@@ -148,7 +148,7 @@ impl Feeder3rdFsm {
     ) -> (u16, &ServoRxPdo, bool) {
         #[cfg(feature = "sensor_3")]
         {
-            if d_in & SENSOR_3 != 0 {
+            if d_in & SENSOR_3 == 0 {
                 self.state = Feeder3rdFsm::fsm_state_pos_1_to_take_part;
                 self.kick_count = if is_manual { 1 } else { 200 };
                 self.d_out |= CLIP_02_BIT;
@@ -168,14 +168,28 @@ impl Feeder3rdFsm {
     fn fsm_state_pos_1_to_take_part(
         &mut self,
         _servo_tx: ServoTxPdo,
-        _d_in: u16,
+        d_in: u16,
         _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
-        self.kick_count -= 1;
-        if self.kick_count == 0 {
-            self.servo_mover.set_target(FEEDER_3RD_POS_02);
-            self.state = Feeder3rdFsm::fsm_state_start_move_02;
+        #[cfg(feature = "sensor_3")]
+        {
+            if d_in & SENSOR_3 == 0 {
+                self.kick_count -= 1;
+                if self.kick_count == 0 {
+                    self.servo_mover.set_target(FEEDER_3RD_POS_02);
+                    self.state = Feeder3rdFsm::fsm_state_start_move_02;
+                }
+            }
         }
+        #[cfg(not(feature = "sensor_3"))]
+        {
+            self.kick_count -= 1;
+            if self.kick_count == 0 {
+                self.servo_mover.set_target(FEEDER_3RD_POS_02);
+                self.state = Feeder3rdFsm::fsm_state_start_move_02;
+            }
+        }
+
         (self.d_out, &self.rx_pdo, self.kick_count == 0)
     }
 
@@ -229,15 +243,31 @@ impl Feeder3rdFsm {
     fn fsm_state_pos_01_empty_pending_step_1(
         &mut self,
         _servo_tx: ServoTxPdo,
-        _d_in: u16,
+        d_in: u16,
         is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
-        self.kick_count -= 1;
-        if self.kick_count == 0 {
-            self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_2;
-            self.d_out = 0;
-            self.kick_count = if is_manual { 1 } else { 300 };
+        #[cfg(feature = "sensor_3")]
+        {
+            if d_in & SENSOR_3 == 0 {
+                self.kick_count -= 1;
+                if self.kick_count == 0 {
+                    self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_2;
+                    self.d_out = 0;
+                    self.kick_count = if is_manual { 1 } else { 300 };
+                }
+            }
         }
+
+        #[cfg(not(feature = "sensor_3"))]
+        {
+            self.kick_count -= 1;
+            if self.kick_count == 0 {
+                self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_2;
+                self.d_out = 0;
+                self.kick_count = if is_manual { 1 } else { 300 };
+            }
+        }
+
         (self.d_out, &self.rx_pdo, false)
     }
 

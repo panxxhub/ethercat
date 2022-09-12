@@ -19,13 +19,14 @@
 	"editor.semanticTokenColorCustomizations": {
 		"rules": {
 			"*.mutable": {
-				"foreground": "#00ff8f",
+				"foreground": "#0ed17c",
 				"fontStyle": "underline"
 			},
 			"*.async": {
 				"fontStyle": "italic"
 			},
 			"*.clojure": {
+				"foreground": "#dfd023",
 				"fontStyle": "italic underline"
 			},
 			"*.attribute": {

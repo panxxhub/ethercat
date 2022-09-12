@@ -13,8 +13,8 @@ const FEEDER_2ND_OUT_BIT_BKR: u16 = 0x4000;
 const FEEDER_2ND_OUT_BIT_MASK: u16 =
     FEEDER_2ND_OUT_BIT_1 | FEEDER_2ND_OUT_BIT_2 | FEEDER_2ND_OUT_BIT_3 | FEEDER_2ND_OUT_BIT_BKR;
 
-const FEEDER_2ND_POS_START: i32 = 125244062;
-const FEEDER_2ND_POS_END: i32 = -30878310;
+const FEEDER_2ND_POS_START: i32 = 130944062;
+const FEEDER_2ND_POS_END: i32 = -30658310;
 
 pub(crate) struct Feeder2nd {
     fsm: Feeder2ndFsm,
@@ -34,7 +34,10 @@ impl Feeder2nd {
         is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         if d_in & FEEDER_SENSOR_BIT_2 != 0 {
-            self.fsm.toggle_product_passed();
+            self.fsm.start_product_passed_count_down(is_manual);
+        }
+        if self.fsm.count_down() {
+            self.fsm.toggle_product_passed()
         }
         (self.fsm.state)(&mut self.fsm, servo_tx, d_in, is_manual)
     }
@@ -54,6 +57,7 @@ struct Feeder2ndFsm {
     kicker_count: u32,
     next_trigger: bool,
     product_passed: bool,
+    product_passed_delay: u32,
     state: fn(
         &mut Feeder2ndFsm,
         servo_tx: ServoTxPdo,
@@ -71,6 +75,7 @@ impl Feeder2ndFsm {
             kicker_count: 0,
             next_trigger: false,
             product_passed: false,
+            product_passed_delay: 350,
             state: Feeder2ndFsm::fsm_state_init,
             servo_mover: Default::default(),
             d_out: FEEDER_2ND_OUT_BIT_BKR, // we start with the breaker on
@@ -85,8 +90,19 @@ impl Feeder2ndFsm {
         }
     }
 
+    fn start_product_passed_count_down(&mut self, is_manual: bool) {
+        self.product_passed_delay = if is_manual { 1 } else { 1000 };
+    }
     fn toggle_product_passed(&mut self) {
-        self.product_passed = false;
+        self.product_passed = true;
+    }
+
+    fn count_down(&mut self) -> bool {
+        if self.product_passed_delay > 0 {
+            self.product_passed_delay -= 1;
+            return self.product_passed_delay == 0;
+        }
+        false
     }
 
     fn fsm_state_init(
@@ -114,7 +130,7 @@ impl Feeder2ndFsm {
         if (d_in & FEEDER_SENSOR_BIT_1) > 0 || self.product_passed {
             self.state = Feeder2ndFsm::fsm_state_start_kick_01;
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_1;
-            self.kicker_count = if is_manual { 1 } else { 350 };
+            self.kicker_count = if is_manual { 1 } else { 380 };
             self.product_passed = false;
         }
         (self.d_out, &self.rx_pdo, false)
@@ -130,7 +146,7 @@ impl Feeder2ndFsm {
         if self.kicker_count == 0 {
             self.state = Feeder2ndFsm::fsm_state_start_kick_02;
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_2;
-            self.kicker_count = if is_manual { 1 } else { 350 };
+            self.kicker_count = if is_manual { 1 } else { 450 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -147,7 +163,7 @@ impl Feeder2ndFsm {
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK)
                 | FEEDER_2ND_OUT_BIT_2
                 | FEEDER_2ND_OUT_BIT_3;
-            self.kicker_count = if is_manual { 1 } else { 350 };
+            self.kicker_count = if is_manual { 1 } else { 450 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
