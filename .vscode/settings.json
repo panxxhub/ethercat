@@ -27,14 +27,14 @@
 			},
 			"*.clojure": {
 				"foreground": "#dfd023",
-				"fontStyle": "italic underline"
+				"fontStyle": "italic"
 			},
 			"*.attribute": {
 				"italic": false,
 				"fontStyle": "bold"
 			},
-			"*.function": {
-				"fontStyle": "bold"
+			"function": {
+				"fontStyle": "italic"
 			},
 		},
 		"enabled": true

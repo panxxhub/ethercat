@@ -13,8 +13,8 @@ const FEEDER_2ND_OUT_BIT_BKR: u16 = 0x4000;
 const FEEDER_2ND_OUT_BIT_MASK: u16 =
     FEEDER_2ND_OUT_BIT_1 | FEEDER_2ND_OUT_BIT_2 | FEEDER_2ND_OUT_BIT_3 | FEEDER_2ND_OUT_BIT_BKR;
 
-const FEEDER_2ND_POS_START: i32 = 130944062;
-const FEEDER_2ND_POS_END: i32 = -30658310;
+const FEEDER_2ND_POS_START: i32 = 132144062;
+const FEEDER_2ND_POS_END: i32 = -29858310;
 
 pub(crate) struct Feeder2nd {
     fsm: Feeder2ndFsm,
@@ -114,6 +114,7 @@ impl Feeder2ndFsm {
         // let mut servo_rx: ServoRxPdo = self.last_servo_rx;
         self.d_out |= FEEDER_2ND_OUT_BIT_BKR;
         self.servo_mover.set_target(FEEDER_2ND_POS_START);
+        self.servo_mover.set_profile_velocity(500);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder2ndFsm::fsm_state_start_pending;
         }

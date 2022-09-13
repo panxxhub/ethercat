@@ -79,6 +79,7 @@ impl Feeder3rdFsm {
         _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.servo_mover.set_target(FEEDER_3RD_POS_03);
+        self.servo_mover.set_profile_velocity(1500);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_start_pending;
             self.d_out |= CLIP_01_BIT;

@@ -56,7 +56,7 @@ impl TopLevel {
             .reduce(|a, b| a && b)
             .unwrap()
         {
-            log::debug!("init finished!");
+            log::info!("init finished!");
             self.state = TopLevel::state_run;
         }
     }

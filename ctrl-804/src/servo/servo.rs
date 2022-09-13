@@ -26,7 +26,8 @@ const CTRL_WORD_NEW_SET_POINT: u16 = 0x0010;
 // const STATUS_SET_POINT_BIT: u16 = 0x0800;
 const STATUS_TARGET_REACHED_BIT: u16 = 0x0200;
 
-pub const PDO_SIZE: usize = std::mem::size_of::<ServoRxPdo>() + std::mem::size_of::<ServoTxPdo>();
+pub(crate) const PDO_SIZE: usize =
+    std::mem::size_of::<ServoRxPdo>() + std::mem::size_of::<ServoTxPdo>();
 
 use super::servo_pdo::{ServoPdo, ServoRxPdo, ServoTxPdo};
 
@@ -46,13 +47,13 @@ impl ServoInitializer {
         }
     }
 
-    pub fn update(&mut self, pdo: &mut ServoPdo) -> bool {
+    pub(crate) fn update(&mut self, pdo: &mut ServoPdo) -> bool {
         (self.fsm.state)(&mut self.fsm, &pdo.tx, &mut pdo.rx)
     }
 }
 
 impl ServoInitializerFsm {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             state: ServoInitializerFsm::fsm_state_start,
         }
@@ -176,6 +177,7 @@ impl Default for ServoInitializerFsm {
 
 pub(crate) struct ServoMover {
     target_position: i32,
+    profile_velocity: u32,
     ready: bool,
     fsm: ServoMoverFsm,
 }
@@ -184,13 +186,14 @@ struct ServoMoverFsm {
     state: fn(
         &mut ServoMoverFsm,
         target_pos: i32,
+        profile_velocity: u32,
         servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool,
 }
 
 impl ServoMover {
-    pub fn set_target(&mut self, target_position: i32) -> bool {
+    pub(crate) fn set_target(&mut self, target_position: i32) -> bool {
         if !self.ready {
             return false;
         }
@@ -198,22 +201,29 @@ impl ServoMover {
         self.fsm.state = ServoMoverFsm::fsm_state_servo_mover_init;
         true
     }
+    pub(crate) fn set_profile_velocity(&mut self, rpm: u32) {
+        self.profile_velocity = (rpm * (1 << 23)) / 60;
+    }
 
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         ServoMover {
             ready: true,
             target_position: 0,
+            profile_velocity: PROFILE_VELOCITY,
             fsm: ServoMoverFsm {
                 state: ServoMoverFsm::fsm_state_servo_mover_init,
             },
         }
     }
-    // pub fn reset(&mut self) {
-    //     self.fsm.state = ServoMoverFsm::fsm_state_servo_mover_init;
-    // }
 
-    pub fn update(&mut self, servo_tx: ServoTxPdo, servo_rx: &mut ServoRxPdo) -> bool {
-        self.ready = (self.fsm.state)(&mut self.fsm, self.target_position, servo_tx, servo_rx);
+    pub(crate) fn update(&mut self, servo_tx: ServoTxPdo, servo_rx: &mut ServoRxPdo) -> bool {
+        self.ready = (self.fsm.state)(
+            &mut self.fsm,
+            self.target_position,
+            self.profile_velocity,
+            servo_tx,
+            servo_rx,
+        );
         self.ready
     }
 }
@@ -228,6 +238,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_mover_init(
         &mut self,
         target_pos: i32,
+        _profile_velocity: u32,
         servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
@@ -259,6 +270,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_profile(
         &mut self,
         target_pos: i32,
+        profile_velocity: u32,
         _servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
@@ -266,7 +278,7 @@ impl ServoMoverFsm {
 
         servo_rx.control_word = 0x000F;
         servo_rx.target_position = target_pos;
-        servo_rx.profile_velocity = PROFILE_VELOCITY;
+        servo_rx.profile_velocity = profile_velocity;
         servo_rx.profile_acceleration = PROFILE_ACCELERATION;
         servo_rx.profile_deceleration = PROFILE_DECELERATION;
         servo_rx.mode_of_operation = 1;
@@ -279,6 +291,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_trigger_new_set_point(
         &mut self,
         target_pos: i32,
+        profile_velocity: u32,
         _servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
@@ -288,7 +301,7 @@ impl ServoMoverFsm {
         // }
         servo_rx.control_word = 0x000F | CTRL_WORD_NEW_SET_POINT;
         servo_rx.target_position = target_pos;
-        servo_rx.profile_velocity = PROFILE_VELOCITY;
+        servo_rx.profile_velocity = profile_velocity;
         servo_rx.profile_acceleration = PROFILE_ACCELERATION;
         servo_rx.profile_deceleration = PROFILE_DECELERATION;
         servo_rx.mode_of_operation = 1;
@@ -299,6 +312,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_wait_for_target_reached(
         &mut self,
         target_pos: i32,
+        profile_velocity: u32,
         servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
@@ -306,7 +320,7 @@ impl ServoMoverFsm {
 
         servo_rx.control_word = 0x000F;
         servo_rx.target_position = target_pos;
-        servo_rx.profile_velocity = PROFILE_VELOCITY;
+        servo_rx.profile_velocity = profile_velocity;
         servo_rx.profile_acceleration = PROFILE_ACCELERATION;
         servo_rx.profile_deceleration = PROFILE_DECELERATION;
         servo_rx.mode_of_operation = 1;
