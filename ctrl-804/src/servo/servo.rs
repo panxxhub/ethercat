@@ -14,16 +14,12 @@ const STATUS_FAULT_BIT: u16 = 0x0008;
 const STATUS_VOLTAGE_ENABLED_BIT: u16 = 0x0010;
 const STATUS_QUICK_STOP_BIT: u16 = 0x0020;
 
-// const FEEDER_1ST_IN_BIT_MASK: u16 = 0x0001;
-// const FEEDER_1ST_OUT_BIT: u16 = 0x0020;
-
 const PROFILE_VELOCITY: u32 = 139810133_u32; //1000_u32 * (1 << 23) / 60; // 1000 rpm -> puu/s
 const PROFILE_DECELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.42) as u32; // 0.42s to stop
 const PROFILE_ACCELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.42) as u32; // 0.42s to start
 
 const CTRL_WORD_NEW_SET_POINT: u16 = 0x0010;
 
-// const STATUS_SET_POINT_BIT: u16 = 0x0800;
 const STATUS_TARGET_REACHED_BIT: u16 = 0x0200;
 
 pub(crate) const PDO_SIZE: usize =
@@ -262,7 +258,7 @@ impl ServoMoverFsm {
         servo_rx.profile_velocity = 0;
         servo_rx.profile_acceleration = 0;
         servo_rx.profile_deceleration = 0;
-        servo_rx.mode_of_operation = 1;
+        servo_rx.mode_of_operation = MODE_OP_PP;
 
         false
     }
@@ -281,7 +277,7 @@ impl ServoMoverFsm {
         servo_rx.profile_velocity = profile_velocity;
         servo_rx.profile_acceleration = PROFILE_ACCELERATION;
         servo_rx.profile_deceleration = PROFILE_DECELERATION;
-        servo_rx.mode_of_operation = 1;
+        servo_rx.mode_of_operation = MODE_OP_PP;
 
         self.state = ServoMoverFsm::fsm_state_servo_trigger_new_set_point;
 
@@ -304,7 +300,7 @@ impl ServoMoverFsm {
         servo_rx.profile_velocity = profile_velocity;
         servo_rx.profile_acceleration = PROFILE_ACCELERATION;
         servo_rx.profile_deceleration = PROFILE_DECELERATION;
-        servo_rx.mode_of_operation = 1;
+        servo_rx.mode_of_operation = MODE_OP_PP;
 
         false
     }
@@ -323,7 +319,7 @@ impl ServoMoverFsm {
         servo_rx.profile_velocity = profile_velocity;
         servo_rx.profile_acceleration = PROFILE_ACCELERATION;
         servo_rx.profile_deceleration = PROFILE_DECELERATION;
-        servo_rx.mode_of_operation = 1;
+        servo_rx.mode_of_operation = MODE_OP_PP;
 
         if servo_tx.status_word & STATUS_TARGET_REACHED_BIT == STATUS_TARGET_REACHED_BIT {
             self.state = ServoMoverFsm::fsm_state_servo_mover_init;
