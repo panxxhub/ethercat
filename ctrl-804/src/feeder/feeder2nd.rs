@@ -4,6 +4,12 @@ use crate::servo::{
 };
 const FEEDER_SENSOR_BIT_1: u16 = 0x0001;
 const FEEDER_SENSOR_BIT_2: u16 = 0x0002;
+const FEEDER_SENSOR_BIT_4: u16 = 0x0008;
+const FEEDER_SENSOR_BIT_5: u16 = 0x0010;
+const FEEDER_SENSOR_BIT_6: u16 = 0x0020;
+
+const FEEDER_SENSOR_BIT_MASK: u16 =
+    FEEDER_SENSOR_BIT_1 + FEEDER_SENSOR_BIT_4 + FEEDER_SENSOR_BIT_5 + FEEDER_SENSOR_BIT_6;
 
 const FEEDER_2ND_OUT_BIT_1: u16 = 0x0001;
 const FEEDER_2ND_OUT_BIT_2: u16 = 0x0002;
@@ -13,16 +19,18 @@ const FEEDER_2ND_OUT_BIT_BKR: u16 = 0x4000;
 const FEEDER_2ND_OUT_BIT_MASK: u16 =
     FEEDER_2ND_OUT_BIT_1 | FEEDER_2ND_OUT_BIT_2 | FEEDER_2ND_OUT_BIT_3 | FEEDER_2ND_OUT_BIT_BKR;
 
-const FEEDER_2ND_POS_START: i32 = 132144062;
+const FEEDER_2ND_POS_START: i32 = 132544062;
 const FEEDER_2ND_POS_END: i32 = -29858310;
 
 pub(crate) struct Feeder2nd {
+    last_d_in: u16,
     fsm: Feeder2ndFsm,
 }
 
 impl Feeder2nd {
     fn new() -> Self {
         Feeder2nd {
+            last_d_in: 0,
             fsm: Default::default(),
         }
     }
@@ -33,12 +41,15 @@ impl Feeder2nd {
         d_in: u16,
         is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
-        if d_in & FEEDER_SENSOR_BIT_2 != 0 {
+        if ((self.last_d_in ^ d_in) & FEEDER_2ND_OUT_BIT_2 != 0)
+            && (d_in & FEEDER_SENSOR_BIT_2 != 0)
+        {
             self.fsm.start_product_passed_count_down(is_manual);
         }
         if self.fsm.count_down() {
-            self.fsm.toggle_product_passed()
+            self.fsm.toggle_product_passed();
         }
+        self.last_d_in = d_in;
         (self.fsm.state)(&mut self.fsm, servo_tx, d_in, is_manual)
     }
 
@@ -114,7 +125,7 @@ impl Feeder2ndFsm {
         // let mut servo_rx: ServoRxPdo = self.last_servo_rx;
         self.d_out |= FEEDER_2ND_OUT_BIT_BKR;
         self.servo_mover.set_target(FEEDER_2ND_POS_START);
-        self.servo_mover.set_profile_velocity(500);
+        self.servo_mover.set_profile_velocity(1500);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder2ndFsm::fsm_state_start_pending;
         }
@@ -128,10 +139,10 @@ impl Feeder2ndFsm {
         is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         // self.d_out &= !FEEDER_2ND_OUT_BIT_BKR;
-        if (d_in & FEEDER_SENSOR_BIT_1) > 0 || self.product_passed {
+        if (d_in & FEEDER_SENSOR_BIT_MASK) > 0 || self.product_passed {
             self.state = Feeder2ndFsm::fsm_state_start_kick_01;
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_1;
-            self.kicker_count = if is_manual { 1 } else { 380 };
+            self.kicker_count = if is_manual { 1 } else { 780 };
             self.product_passed = false;
         }
         (self.d_out, &self.rx_pdo, false)
@@ -164,7 +175,7 @@ impl Feeder2ndFsm {
             self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK)
                 | FEEDER_2ND_OUT_BIT_2
                 | FEEDER_2ND_OUT_BIT_3;
-            self.kicker_count = if is_manual { 1 } else { 450 };
+            self.kicker_count = if is_manual { 3 } else { 850 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -176,10 +187,12 @@ impl Feeder2ndFsm {
         _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.kicker_count -= 1;
+        if (self.kicker_count == 200) || (self.kicker_count == 2) {
+            self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_BKR;
+        }
         if self.kicker_count == 0 {
             self.state = Feeder2ndFsm::fsm_state_move_to_end;
             self.servo_mover.set_target(FEEDER_2ND_POS_END);
-            self.d_out = (self.d_out & !FEEDER_2ND_OUT_BIT_MASK) | FEEDER_2ND_OUT_BIT_BKR;
         }
         (self.d_out, &self.rx_pdo, false)
     }

@@ -19,8 +19,12 @@ pub(crate) struct Feeder3rd {
 struct Feeder3rdFsm {
     kick_count: u32,
     next_trigger: bool,
-    state:
-        fn(&mut Self, servo_tx: ServoTxPdo, d_in: u16, is_manual: bool) -> (u16, &ServoRxPdo, bool),
+    state: fn(
+        &mut Feeder3rdFsm,
+        servo_tx: ServoTxPdo,
+        d_in: u16,
+        is_manual: bool,
+    ) -> (u16, &ServoRxPdo, bool),
     servo_mover: ServoMover,
 
     d_out: u16,
@@ -79,7 +83,7 @@ impl Feeder3rdFsm {
         _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.servo_mover.set_target(FEEDER_3RD_POS_03);
-        self.servo_mover.set_profile_velocity(1500);
+        self.servo_mover.set_profile_velocity(2500);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_start_pending;
             self.d_out |= CLIP_01_BIT;

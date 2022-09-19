@@ -15,8 +15,8 @@ const STATUS_VOLTAGE_ENABLED_BIT: u16 = 0x0010;
 const STATUS_QUICK_STOP_BIT: u16 = 0x0020;
 
 const PROFILE_VELOCITY: u32 = 139810133_u32; //1000_u32 * (1 << 23) / 60; // 1000 rpm -> puu/s
-const PROFILE_DECELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.42) as u32; // 0.42s to stop
-const PROFILE_ACCELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.42) as u32; // 0.42s to start
+const PROFILE_DECELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.21) as u32; // 50ms to stop
+const PROFILE_ACCELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.21) as u32; // 640ms to start
 
 const CTRL_WORD_NEW_SET_POINT: u16 = 0x0010;
 
@@ -198,7 +198,7 @@ impl ServoMover {
         true
     }
     pub(crate) fn set_profile_velocity(&mut self, rpm: u32) {
-        self.profile_velocity = (rpm * (1 << 23)) / 60;
+        self.profile_velocity = (rpm * 8388608) / 60;
     }
 
     pub(crate) fn new() -> Self {
@@ -234,7 +234,7 @@ impl ServoMoverFsm {
     fn fsm_state_servo_mover_init(
         &mut self,
         target_pos: i32,
-        _profile_velocity: u32,
+        profile_velocity: u32,
         servo_tx: ServoTxPdo,
         servo_rx: &mut ServoRxPdo,
     ) -> bool {
@@ -255,9 +255,9 @@ impl ServoMoverFsm {
 
         servo_rx.control_word = 0x000F;
         servo_rx.target_position = actual_pos;
-        servo_rx.profile_velocity = 0;
-        servo_rx.profile_acceleration = 0;
-        servo_rx.profile_deceleration = 0;
+        servo_rx.profile_velocity = profile_velocity;
+        servo_rx.profile_acceleration = PROFILE_ACCELERATION;
+        servo_rx.profile_deceleration = PROFILE_DECELERATION;
         servo_rx.mode_of_operation = MODE_OP_PP;
 
         false
