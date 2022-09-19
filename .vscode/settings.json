@@ -1,5 +1,5 @@
 {
-	"editor.fontFamily": "'Cascadia Code', 'Jetbrains Mono', 'Inconsolata', 'Inconsolata NF', 'Fira Code', Consolas, 'Courier New', monospace",
+	"editor.fontFamily": "'Jetbrains Mono', 'Cascadia Code', 'Inconsolata', 'Inconsolata NF', 'Fira Code', Consolas, 'Courier New', monospace",
 	"editor.fontLigatures": true,
 	"editor.fontSize": 15,
 	"editor.semanticHighlighting.enabled": true,

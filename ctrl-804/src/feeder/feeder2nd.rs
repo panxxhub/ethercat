@@ -125,7 +125,7 @@ impl Feeder2ndFsm {
         // let mut servo_rx: ServoRxPdo = self.last_servo_rx;
         self.d_out |= FEEDER_2ND_OUT_BIT_BKR;
         self.servo_mover.set_target(FEEDER_2ND_POS_START);
-        self.servo_mover.set_profile_velocity(1500);
+        self.servo_mover.set_profile_velocity(300);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder2ndFsm::fsm_state_start_pending;
         }

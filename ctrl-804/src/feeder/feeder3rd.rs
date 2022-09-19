@@ -83,7 +83,7 @@ impl Feeder3rdFsm {
         _is_manual: bool,
     ) -> (u16, &ServoRxPdo, bool) {
         self.servo_mover.set_target(FEEDER_3RD_POS_03);
-        self.servo_mover.set_profile_velocity(2500);
+        self.servo_mover.set_profile_velocity(2600);
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_start_pending;
             self.d_out |= CLIP_01_BIT;
@@ -114,7 +114,7 @@ impl Feeder3rdFsm {
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             self.state = Feeder3rdFsm::fsm_state_start_move_04_clip;
             self.d_out &= !CLIP_01_BIT; // toggle off clip, open clip
-            self.kick_count = if is_manual { 1 } else { 200 };
+            self.kick_count = if is_manual { 1 } else { 500 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -155,7 +155,7 @@ impl Feeder3rdFsm {
         {
             if d_in & SENSOR_3 == 0 {
                 self.state = Feeder3rdFsm::fsm_state_pos_1_to_take_part;
-                self.kick_count = if is_manual { 1 } else { 200 };
+                self.kick_count = if is_manual { 1 } else { 500 };
                 self.d_out |= CLIP_02_BIT;
             }
         }
@@ -207,7 +207,7 @@ impl Feeder3rdFsm {
         if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
             // target reached
             self.state = Feeder3rdFsm::fsm_state_02_release;
-            self.kick_count = if is_manual { 1 } else { 200 };
+            self.kick_count = if is_manual { 1 } else { 500 };
             self.d_out |= CLIP_01_BIT;
         }
         (self.d_out, &self.rx_pdo, false)
@@ -223,7 +223,7 @@ impl Feeder3rdFsm {
         if self.kick_count == 0 {
             self.servo_mover.set_target(FEEDER_3RD_POS_01);
             self.state = Feeder3rdFsm::fsm_state_pos_01_empty;
-            self.kick_count = if is_manual { 1 } else { 300 };
+            self.kick_count = if is_manual { 1 } else { 500 };
         }
         (self.d_out, &self.rx_pdo, false)
     }
@@ -239,7 +239,7 @@ impl Feeder3rdFsm {
         } else {
             if self.servo_mover.update(servo_tx, &mut self.rx_pdo) {
                 self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_1;
-                self.kick_count = if is_manual { 1 } else { 200 };
+                self.kick_count = if is_manual { 1 } else { 1000 };
             }
         }
         (self.d_out, &self.rx_pdo, false)
@@ -258,7 +258,7 @@ impl Feeder3rdFsm {
                 if self.kick_count == 0 {
                     self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_2;
                     self.d_out = 0;
-                    self.kick_count = if is_manual { 1 } else { 300 };
+                    self.kick_count = if is_manual { 1 } else { 2000 };
                 }
             }
         }
@@ -269,7 +269,7 @@ impl Feeder3rdFsm {
             if self.kick_count == 0 {
                 self.state = Feeder3rdFsm::fsm_state_pos_01_empty_pending_step_2;
                 self.d_out = 0;
-                self.kick_count = if is_manual { 1 } else { 300 };
+                self.kick_count = if is_manual { 1 } else { 2000 };
             }
         }
 

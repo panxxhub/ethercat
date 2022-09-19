@@ -15,8 +15,8 @@ const STATUS_VOLTAGE_ENABLED_BIT: u16 = 0x0010;
 const STATUS_QUICK_STOP_BIT: u16 = 0x0020;
 
 const PROFILE_VELOCITY: u32 = 139810133_u32; //1000_u32 * (1 << 23) / 60; // 1000 rpm -> puu/s
-const PROFILE_DECELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.21) as u32; // 50ms to stop
-const PROFILE_ACCELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.21) as u32; // 640ms to start
+const PROFILE_DECELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.62) as u32; // 50ms to stop
+const PROFILE_ACCELERATION: u32 = (PROFILE_VELOCITY as f64 / 0.62) as u32; // 640ms to start
 
 const CTRL_WORD_NEW_SET_POINT: u16 = 0x0010;
 
@@ -197,8 +197,9 @@ impl ServoMover {
         self.fsm.state = ServoMoverFsm::fsm_state_servo_mover_init;
         true
     }
+
     pub(crate) fn set_profile_velocity(&mut self, rpm: u32) {
-        self.profile_velocity = (rpm * 8388608) / 60;
+        self.profile_velocity = rpm * 139810_u32;
     }
 
     pub(crate) fn new() -> Self {
